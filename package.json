@@ -2,9 +2,10 @@
   "name": "unicode-ranger",
   "version": "1.0.0",
   "description": "Get a unicode range from the contents of a URL.",
-  "main": "dist/index.js",
+  "main": "dist/unicode-ranger.js",
   "scripts": {
-    "build": "babel src -d dist"
+    "build": "babel src -d dist",
+    "prepublish": "gulp clean && gulp"
   },
   "repository": {
     "type": "git",
