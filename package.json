@@ -1,6 +1,6 @@
 {
   "name": "unicode-ranger",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Get a unicode range from the contents of a URL.",
   "main": "dist/unicode-ranger.js",
   "scripts": {
