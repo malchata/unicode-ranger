@@ -1,8 +1,8 @@
 {
   "name": "unicode-ranger",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Get a unicode range from the contents of a URL.",
-  "main": "dist/unicode-ranger.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "babel src -d dist",
     "prepublish": "gulp clean && gulp"
@@ -21,7 +21,7 @@
     "unicode",
     "range"
   ],
-  "author": "Jeremy Wagner <jeremy.l.wagner@gmail.com> (https://jeremywagner.me/)",
+  "author": "Jeremy Wagner <jeremy.l.wagner@gmail.com> (https://jeremywagner.me)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/malchata/unicode-ranger/issues"
