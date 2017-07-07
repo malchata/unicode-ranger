@@ -54,13 +54,13 @@ const dedupe = (str) => {
 };
 
 const getUnicodes = (str) => {
-	let unicodeArray = [];
+	let codePoints = [];
 
-	for(let i = 0; i < str.length; i++){
-		unicodeArray.push(str.charCodeAt(i));
+	for(let symbol of str){
+		codePoints.push(symbol.codePointAt(0));
 	}
 
-	return sortArray(unicodeArray);
+	return sortArray(codePoints);
 };
 
 // A much, much smarter person than me solved this problem, and their code represents the bulk of the work here:
