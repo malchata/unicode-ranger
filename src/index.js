@@ -1,123 +1,85 @@
-"use strict";
+import Promise from "bluebird";
+import regeneratorRuntime from "regenerator-runtime";
+import puppeteer from "puppeteer";
+import request from "request-promise";
+import xml2js from "xml2js-es6-promise";
+import CharacterSet from "characterset";
 
-import request from "request";
-import cheerio from "cheerio";
-import Promise from "promise";
+export default class UnicodeRanger{
+	constructor(urls, userOptions){
+		this.defaultOptions = {
+			excludeElements: ["SCRIPT", "BR", "TRACK", "WBR", "PARAM", "HR", "LINK", "OBJECT", "STYLE", "PICTURE", "IMG", "AUDIO", "VIDEO", "SOURCE", "EMBED", "APPLET", "TITLE", "META", "HEAD"],
+			ignoreFonts: ["serif", "sans-serif", "cursive", "fantasy", "monospace"],
+			safe: true
+		};
+		this.options = typeof userOptions === "undefined" ? this.defaultOptions : Object.assign(this.defaultOptions, userOptions);
+		this.calls = [];
+		this.contents = {};
+		this.ranges;
 
-const defaultOptions = {
-	excludeElements: "meta,script,code,link,object,style,picture,img,video,source,embed,applet"
-};
+		if(urls.length === 0){
+			return Promise.reject("No URLs specified!").catch((err)=>{
+				console.log(err);
+			});
+		}
 
-let options = {};
+		urls.forEach((url)=>{
+			this.calls.push(this.makeRequest(url));
+		});
 
-const makeRequest = (url, userOptions) => {
-	if(userOptions === undefined){
-		options = defaultOptions;
-	}
-	else{
-		options = assign(defaultOptions, userOptions);
-	}
-
-	return new Promise((resolve, reject) => {
-		request(url, (error, response, body) => {
-			if(response !== undefined){
-				if(response.statusCode === 200){
-					resolve(getTextFromHTML(body));
+		return Promise.all(this.calls).then((res)=>{
+			for(let content in this.contents){
+				if(this.options.ignoreFonts.indexOf(content) !== -1 || this.contents[content].length === 0){
+					delete this.contents[content];
 				}
 				else{
-					reject("Server responded with a " + response.statusCode + " error code.");
+					this.contents[content] = this.getRanges(this.dedupe(this.contents[content]));
 				}
 			}
-			else{
-				reject("Couldn't reach server.");
-			}
+
+			console.log(this.contents);
+		}).catch((err)=>{
+			console.log(err);
 		});
-	});
-};
+	};
 
-const getTextFromHTML = (body) => {
-	let $ = cheerio.load(body);
-	$(options.excludeElements).remove();
-	return $("body").text();
-};
+	makeRequest(url){
+		return puppeteer.launch().then(async (browser)=>{
+			const page = await browser.newPage();
+			page.on("console", msg => console.log("PAGE LOG: ", msg.text));
+			await page.goto(url);
+			const pageContents = await page.evaluate(()=>{
+				let contents = {};
 
-const dedupe = (str) => {
-	let unique = "";
+				document.documentElement.querySelectorAll("*").forEach((element)=>{
+					let primary = getComputedStyle(element).getPropertyValue("font-family").split(",")[0];
+					typeof contents[primary] === "undefined" ? contents[primary] = element.innerText : contents[primary] += element.innerText;
+				});
 
-	for(let i = 0; i < str.length; i++){
-		if(unique.indexOf(str[i]) === -1){
-			unique += str[i];
-		}
-	}
+				return contents;
+			});
 
-	return unique;
-};
+			for(let contents in pageContents){
+				typeof this.contents[contents] === "undefined" ? this.contents[contents] = pageContents[contents] : this.contents[contents] += pageContents[contents];
+			}
 
-const getUnicodes = (str) => {
-	let codePoints = [];
+			await browser.close();
+		});
+	};
 
-	for(let symbol of str){
-		codePoints.push(symbol.codePointAt(0));
-	}
+	dedupe(str){
+		let unique = "";
 
-	return sortArray(codePoints);
-};
-
-// A much, much smarter person than me solved this problem, and their code represents the bulk of the work here:
-// http://stackoverflow.com/questions/2270910/how-to-convert-sequence-of-numbers-in-an-array-to-range-of-numbers
-const getRanges = (arr) => {
-	let ranges = [],
-		start,
-		end;
-
-	for(let i = 0; i < arr.length; i++){
-		start = arr[i];
-		end = start;
-
-		while(arr[i + 1] - arr[i] == 1){
-			end = arr[i + 1];
-			i++;
+		for(let i = 0; i < str.length; i++){
+			if(unique.indexOf(str[i]) === -1){
+				unique += str[i];
+			}
 		}
 
-		ranges.push(start == end ? "U+" + getHexValue(start) : "U+" + getHexValue(start) + "-" + getHexValue(end));
+		return unique;
+	};
+
+	getRanges(str){
+		return new CharacterSet(str).toHexRangeString();
 	}
-
-	return ranges.toString();
 };
-
-const sortArray = (arr) => {
-	return arr.sort((a, b) => {
-		return a - b;
-	});
-};
-
-const getHexValue = (num) => {
-	return num.toString(16).toUpperCase();
-};
-
-const unicodeRanger = (urls) => {
-	let urlArr = urls.split(";"),
-		calls = [];
-
-	for(let i = 0; i < urlArr.length; i++){
-		calls.push(makeRequest(urlArr[i]));
-	}
-
-	return Promise.all(calls).then((res) => {
-		let bodyContents = "";
-
-		for(let j in res){
-			bodyContents += res[j];
-		}
-
-		let characters = dedupe(bodyContents),
-			unicodes = getUnicodes(characters),
-			ranges = getRanges(unicodes);
-
-		return ranges;
-	}).catch((err) => {
-		return err;
-	});
-};
-
-export default unicodeRanger;

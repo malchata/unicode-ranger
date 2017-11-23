@@ -1,11 +1,12 @@
 {
   "name": "unicode-ranger",
-  "version": "1.0.4",
-  "description": "Get a unicode range from the contents of a URL.",
+  "version": "2.0.0",
+  "description": "Get a unicode range from the contents of URLs.",
   "main": "dist/index.js",
   "scripts": {
-    "build": "babel src -d dist",
-    "prepublish": "gulp clean && gulp"
+    "build": "npx babel src -d dist",
+    "prepublish": "rimraf dist&&npx babel src -d dist",
+    "test": "node dist/test.js"
   },
   "repository": {
     "type": "git",
@@ -13,31 +14,31 @@
   },
   "keywords": [
     "unicode-range",
-    "css",
-    "subset",
-    "subsetting",
     "font",
     "fonts",
     "unicode",
-    "range"
+    "range",
+    "unicode-ranger"
   ],
-  "author": "Jeremy Wagner <jeremy.l.wagner@gmail.com> (https://jeremywagner.me)",
+  "author": "Jeremy Wagner <jeremy.l.wagner@gmail.com> (https://jeremywagner.me/)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/malchata/unicode-ranger/issues"
   },
   "homepage": "https://github.com/malchata/unicode-ranger#readme",
-  "devDependencies": {
-    "babel-cli": "^6.18.0",
-    "babel-preset-es2015": "^6.18.0",
-    "del": "^2.2.2",
-    "gulp": "^3.9.1",
-    "gulp-babel": "^6.1.2",
-    "gulp-util": "^3.0.7"
-  },
+  "devDependencies": {},
   "dependencies": {
-    "cheerio": "^0.22.0",
-    "promise": "^7.1.1",
-    "request": "^2.79.0"
+    "babel-cli": "^6.26.0",
+    "babel-plugin-transform-regenerator": "^6.26.0",
+    "babel-preset-env": "^1.6.1",
+    "bluebird": "^3.5.1",
+    "characterset": "^1.3.0",
+    "fontkit": "^1.7.7",
+    "puppeteer": "^0.13.0",
+    "regenerator-runtime": "^0.11.0",
+    "request": "^2.83.0",
+    "request-promise": "^4.2.2",
+    "rimraf": "^2.6.2",
+    "xml2js-es6-promise": "^1.1.1"
   }
 }

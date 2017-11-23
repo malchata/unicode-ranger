@@ -1,4 +1,10 @@
-"use strict";
+import UnicodeRanger from "./index.js";
 
-import unicodeRanger from "./index.js";
-unicodeRanger("https://en.wikipedia.org").then((data) => console.log(data));
+let urls = [
+	"https://jeremywagner.me/about",
+	"https://jeremywagner.me/writing",
+	"https://jeremywagner.me/hire"
+];
+
+new UnicodeRanger(urls).then((data) => console.log(data));
+// new UnicodeRanger(urls);
