@@ -1,26 +1,35 @@
+import { join } from "path";
+import { readFileSync, writeFileSync } from "fs";
+import { sync as commandExistsSync } from "command-exists";
+import { exec } from "child_process";
 import Promise from "bluebird";
 import regeneratorRuntime from "regenerator-runtime";
 import request from "request-promise";
 import xmlParser from "xml2json";
 import puppeteer from "puppeteer";
 import CharacterSet from "characterset";
+import ttf2eot from "ttf2eot";
+import ttf2woff from "ttf2woff";
+import ttf2woff2 from "ttf2woff2";
+
+process.setMaxListeners(Infinity);
 
 export default class UnicodeRanger{
-	constructor(urls, userOptions, subsetMap){
+	constructor(urls, userOptions){
 		this.defaultOptions = {
 			excludeElements: ["SCRIPT", "BR", "TRACK", "WBR", "PARAM", "HR", "LINK", "OBJECT", "STYLE", "PICTURE", "IMG", "AUDIO", "VIDEO", "SOURCE", "EMBED", "APPLET", "TITLE", "META", "HEAD"],
-			ignoreFonts: ["serif", "sans-serif", "cursive", "fantasy", "monospace"],
-			safe: true
+			ignoreHiddenElements: false
 		};
 		this.regexes = {
-			sitemapXml: /sitemap\.xml$/i,
+			sitemapXml: /\/sitemap\.xml$/i,
 			validUrl: /^https?:\/\/.*$/i
 		};
 		this.options = typeof userOptions === "undefined" ? this.defaultOptions : Object.assign(this.defaultOptions, userOptions);
+		this.alwaysIgnore = ["serif", "sans-serif", "cursive", "fantasy", "monospace"];
+		this.ignoreFonts = "ignoreFonts" in this.options === false ? this.alwaysIgnore : [...this.alwaysIgnore, ...this.options.ignoreFonts];
 		this.urls = [];
-		this.calls = [];
 		this.contents = {};
-		this.ranges;
+		this.ranges = {};
 
 		if(urls.length === 0){
 			return Promise.reject("No URLs specified!").catch((err)=>new Error(err));
@@ -31,69 +40,60 @@ export default class UnicodeRanger{
 		let sitemapUrls = urls.filter(url=>this.regexes.sitemapXml.test(url) === true);
 
 		if(sitemapUrls.length > 0){
-			sitemapUrls.forEach(async (sitemapUrl)=>{
-				urls.splice(urls.indexOf(sitemapUrl), 1);
-				const xml = await request(sitemapUrl).then(xml=>xml);
-				const urlList = JSON.parse(xmlParser.toJson(xml)).urlset.url;
-
-				for(let urlListItem in urlList){
-					urls.push(urlList[urlListItem].loc);
-				}
-
-				if(sitemapUrls.indexOf(sitemapUrl) === sitemapUrls.length -1){
-					this.urls = [...this.dedupe(urls)];
-					this.processUrls();
-				}
-			});
-		}
-		else{
-			this.urls = [...this.dedupe(urls)];
-			this.processUrls();
+			// TODO: Sitemap logic. Earlier logic was far too complex
 		}
 
-		return Promise.all(this.calls).then((res)=>{
-			for(let content in this.contents){
-				if(this.options.ignoreFonts.indexOf(content) !== -1 || this.contents[content].length === 0){
-					delete this.contents[content];
-				}
-				else{
-					this.contents[content] = this.getRanges(this.dedupe(this.contents[content]));
-				}
+		return new Promise(async (resolve, reject)=>{
+			const browser = await puppeteer.launch().then(browser=>browser);
+			this.urls = this.dedupe(urls);
+
+			for(let url in this.urls){
+				await this.processUrl(this.urls[url], browser);
 			}
 
-			//console.log(this.contents);
-		}).catch(err=>new Error(err));
+			await browser.close();
+			this.getRanges();
+
+			if("subsetMap" in this.options){
+				this.subset();
+			}
+			else{
+				resolve(this.ranges);
+			}
+		});
 	};
 
-	processUrls(){
-		this.urls.forEach(async (url)=>{
-			this.calls.push(await puppeteer.launch().then(async (browser)=>{
-				console.log(`Browser up for ${url}`);
+	processUrl(url, browser){
+		return new Promise(async (resolve, reject)=>{
+			const page = await browser.newPage();
+			//page.on("console", msg => console.log("PAGE LOG: ", msg.text));
+			await page.goto(url);
 
-				const page = await browser.newPage();
-				page.on("console", msg => console.log("PAGE LOG: ", msg.text));
-				await page.goto(url);
-				const pageContents = await page.evaluate(()=>{
-					let contents = {};
+			const pageContents = await page.evaluate((options)=>{
+				let contents = {};
 
-					document.documentElement.querySelectorAll("*").forEach((element)=>{
-						let primary = getComputedStyle(element).getPropertyValue("font-family").split(",")[0];
-						typeof contents[primary] === "undefined" ? contents[primary] = element.innerText : contents[primary] += element.innerText;
-					});
-
-					console.dir(contents);
-					return contents;
+				document.documentElement.querySelectorAll("*").forEach((element)=>{
+					if(options.excludeElements.indexOf(element.tagName) === -1){
+						let primaryFontFamily = getComputedStyle(element).getPropertyValue("font-family").split(",")[0].replace(/\"/ig, "");
+						typeof contents[primaryFontFamily] === "undefined" ? contents[primaryFontFamily] = element.innerText : contents[primaryFontFamily] += element.innerText;
+					}
 				});
 
-				for(let contents in pageContents){
-					typeof this.contents[contents] === "undefined" ? this.contents[contents] = pageContents[contents] : this.contents[contents] += pageContents[contents];
-				}
+				return contents;
+			}, this.options);
 
-				await browser.close();
+			for(let contents in pageContents){
+				typeof this.contents[contents] === "undefined" ? this.contents[contents] = pageContents[contents] : this.contents[contents] += pageContents[contents];
+			}
 
-				console.log(`Browser down for ${url}`);
-			}));
-		});
+			resolve(pageContents);
+		}).catch(err=>new Error(err));
+	}
+
+	getRanges(){
+		for(let content in this.contents){
+			this.ranges[content] = new CharacterSet(this.dedupe(this.contents[content])).toHexRangeString();
+		}
 	}
 
 	dedupe(str){
@@ -108,7 +108,52 @@ export default class UnicodeRanger{
 		return unique;
 	};
 
-	getRanges(str){
-		return new CharacterSet(str).toHexRangeString();
+	async subset(font){
+		const run = Promise.promisify(exec);
+
+		if(typeof this.options.subsetFolder === "undefined"){
+			this.options.subsetFolder = __dirname;
+		}
+
+		if(commandExistsSync("pyftsubset")){
+			for(let font in this.options.subsetMap){
+				let fontFiles = this.options.subsetMap[font].files;
+
+				if(typeof fontFiles === "string"){
+					fontFiles = [fontFiles];
+				}
+
+				for(let file in fontFiles){
+					let fontFile = join(this.options.subsetFolder, fontFiles[file]);
+					let outputFile = fontFile.replace(".ttf", ".subset.ttf");
+					let unicodeRange = this.ranges[font];
+					await run(`pyftsubset ${fontFile} --unicodes=${unicodeRange} --name-IDs='*' --output-file=${outputFile}`);
+					this.exportEOT(outputFile, outputFile.replace(".ttf", ".eot"));
+					this.exportWOFF(outputFile, outputFile.replace(".ttf", ".woff"));
+					this.exportWOFF2(outputFile, outputFile.replace(".ttf", ".woff2"));
+				}
+			}
+		}
+		else{
+			return Promise.reject("pyftsubset is missing! Please install fonttools to subset fonts.").catch(err=>new Error(err));
+		}
+	}
+
+	exportEOT(src, dest){
+		let input = readFileSync(src);
+		let ttf = new Uint8Array(input);
+		let eot = new Buffer(ttf2eot(ttf).buffer);
+		writeFileSync(dest, eot);
+	}
+
+	async exportWOFF(src, dest){
+		let input = readFileSync(src);
+		let ttf = new Uint8Array(input);
+		let eot = new Buffer(ttf2woff(ttf).buffer);
+		writeFileSync(dest, eot);
+	}
+
+	async exportWOFF2(src, dest){
+		writeFileSync(dest, ttf2woff2(readFileSync(src)));
 	}
 };
