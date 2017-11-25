@@ -32,7 +32,7 @@ export default class UnicodeRanger{
 		this.contents = {};
 		this.ranges = {};
 
-		if("subsetMap" in this.options && commandExistsSync("pyft2subset") === false){
+		if("subsetMap" in this.options && commandExistsSync("pyftsubset") === false){
 			delete this.options.subsetMap;
 
 			if(this.options.verbose === true){
