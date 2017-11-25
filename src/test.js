@@ -7,7 +7,7 @@ let urls = [
 	"https://jeremywagner.me/hire/"
 ];
 
-const output = new UnicodeRanger(urls, {
+const options = {
 	subsetMap: {
 		"Monoton": {
 			files: "./monoton.ttf"
@@ -19,7 +19,9 @@ const output = new UnicodeRanger(urls, {
 			files: "./fredoka-one.ttf"
 		},
 	}
-}).then((unicodeRanges)=>{
+};
+
+const output = new UnicodeRanger(urls, options).then((unicodeRanges)=>{
 	for(var fontFamily in unicodeRanges){
 		console.log(`${fontFamily}:`);
 		console.log(unicodeRanges[fontFamily]);
