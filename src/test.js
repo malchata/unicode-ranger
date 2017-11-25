@@ -1,13 +1,9 @@
 import UnicodeRanger from "./index.js";
 
-let urls = [
-	"https://jeremywagner.me/about/",
-	"https://jeremywagner.me/writing/",
-	//"https://jeremywagner.me/sitemap.xml",
-	"https://jeremywagner.me/hire/"
-];
+let urls = "https://jeremywagner.me/";
 
 const options = {
+	verbose: true,
 	subsetMap: {
 		"Monoton": {
 			files: "./monoton.ttf"
@@ -27,4 +23,7 @@ const output = new UnicodeRanger(urls, options).then((unicodeRanges)=>{
 		console.log(unicodeRanges[fontFamily]);
 		console.log("");
 	}
-}).catch(err=>new Error(err));
+}).catch(err=>{
+	console.log(err);
+	return new Error(err);
+});
