@@ -21,10 +21,14 @@ export default class UnicodeRanger{
 			excludeElements: ["SCRIPT", "BR", "TRACK", "WBR", "PARAM", "HR", "LINK", "OBJECT", "STYLE", "PICTURE", "IMG", "AUDIO", "VIDEO", "SOURCE", "EMBED", "APPLET", "TITLE", "META", "HEAD"],
 			ignoreHiddenElements: false,
 			ignoreFonts: ["serif", "sans-serif", "cursive", "fantasy", "monospace"],
+			screenSizes: [
+				[320, 240],
+				[1280, 800]
+			]
 			verbose: false
 		};
 		this.regexes = {
-			sitemapXml: /\/sitemap\.xml$/i,
+			sitemapXml: /sitemap\.xml$/i,
 			validUrl: /^https?:\/\/.*$/i
 		};
 		this.options = typeof userOptions === "undefined" ? this.defaultOptions : Object.assign(this.defaultOptions, userOptions);
@@ -105,9 +109,13 @@ export default class UnicodeRanger{
 			}
 
 			if(this.regexes.validUrl.test(url) === true){
-				console.log(`|- [${url}] Accessing URL...`);
+				if(this.options.verbose === true){
+					console.log(`|- [${url}] Accessing URL...`);
+				}
 
-				await page.goto(url);
+				await page.goto(url, {
+					waitUntil: "load"
+				});
 
 				const pageContents = await page.evaluate((options)=>{
 					let contents = {};
@@ -118,6 +126,18 @@ export default class UnicodeRanger{
 
 							if(options.ignoreFonts.indexOf(primaryFontFamily) === -1){
 								typeof contents[primaryFontFamily] === "undefined" ? contents[primaryFontFamily] = element.innerText : contents[primaryFontFamily] += element.innerText;
+							}
+
+							let pseudoBeforeFontFamily = getComputedStyle(element, ":before").getPropertyValue("font-family").split(",")[0].replace(/\"/ig, "");
+
+							if(options.ignoreFonts.indexOf(pseudoBeforeFontFamily) === -1){
+								typeof contents[pseudoBeforeFontFamily] === "undefined" ? contents[pseudoBeforeFontFamily] = getComputedStyle(element, ":before").getPropertyValue("content") : contents[pseudoBeforeFontFamily] += getComputedStyle(element, ":before").getPropertyValue("content");
+							}
+
+							let pseudoAfterFontFamily = getComputedStyle(element, ":after").getPropertyValue("font-family").split(",")[0].replace(/\"/ig, "");
+
+							if(options.ignoreFonts.indexOf(pseudoAfterFontFamily) === -1){
+								typeof contents[pseudoAfterFontFamily] === "undefined" ? contents[pseudoAfterFontFamily] = getComputedStyle(element, ":after").getPropertyValue("content") : contents[pseudoAfterFontFamily] += getComputedStyle(element, ":before").getPropertyValue("content");
 							}
 						}
 					});
@@ -160,6 +180,7 @@ export default class UnicodeRanger{
 	getRanges(){
 		for(let content in this.contents){
 			this.ranges[content] = new CharacterSet(this.dedupe(this.contents[content])).toHexRangeString();
+			console.log(`${content}: ${this.dedupe(this.contents[content])}`);
 		}
 	}
 

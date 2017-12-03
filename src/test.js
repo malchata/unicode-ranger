@@ -1,20 +1,21 @@
 import UnicodeRanger from "./index.js";
 
-let urls = "https://jeremywagner.me/";
+let urls = [
+	"http://sujata.local/page-sitemap.xml",
+	"http://sujata.local/product-sitemap.xml",
+	"http://sujata.local/product-category-sitemap.xml"
+];
 
 const options = {
 	verbose: true,
-	subsetMap: {
-		"Monoton": {
-			files: "./monoton.ttf"
-		},
-		"Fira Sans": {
-			files: ["./fira-sans-regular.ttf", "./fira-sans-regular-italic.ttf", "./fira-sans-bold.ttf"]
-		},
-		"Fredoka One": {
-			files: "./fredoka-one.ttf"
-		},
-	}
+	// subsetMap: {
+	// 	"Raleway": {
+	// 		files: "./raleway-regular.ttf"
+	// 	},
+	// 	"Droid Serif": {
+	// 		files: ["./droid-serif-regular.ttf", "./droid-serif-bold.ttf"]
+	// 	},
+	// }
 };
 
 const output = new UnicodeRanger(urls, options).then((unicodeRanges)=>{
